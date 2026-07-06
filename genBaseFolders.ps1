@@ -621,7 +621,7 @@ $dependencies = @(
     "firebase_auth"
     "cloud_firestore"
 )
-$devPackages = @(
+$devDependencies = @(
     "build_runner"
     "injectable_generator"
     "flutter_lints"
@@ -724,7 +724,7 @@ Add-LatestPackages -Packages $dependencies
 
 Write-Host ""
 Write-Host "▶ Updating pubspec.yaml (dev_dependencies)..." -ForegroundColor Magenta
-Add-LatestPackages -Packages $devDependencies -Dev
+Add-LatestPackages -Packages $devdependencies -Dev
 
 Write-Host ""
 Write-Host "▶ Registering assets folders in pubspec.yaml..." -ForegroundColor Magenta
