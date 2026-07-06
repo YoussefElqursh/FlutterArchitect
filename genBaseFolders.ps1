@@ -129,9 +129,17 @@ Future<void> main() async {
 import 'package:flutter/material.dart';
 import '../app.dart';
 import '../bindings/app_bindings.dart';
+import '../firebase_options.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../observers/app_observer.dart';
 Future<void> bootstrap() async {
-  WidgetsFlutterBinding.ensureInitialized();
+ WidgetsFlutterBinding.ensureInitialized();
+ Bloc.observer = AppBlocObserver();
 
+await Firebase.initializeApp(
+  options: DefaultFirebaseOptions.currentPlatform,
+);
   await AppBindings.init();
 
   runApp(const App());
@@ -200,9 +208,10 @@ class RouteNames {
     # =========================
 
     "lib/app/bindings/app_bindings.dart"      = @'
-class AppBindings {
+import '../../core/di/dependency_injection.dart';
+    class AppBindings {
   static Future<void> init() async {
-    // Register dependencies here
+    configureDependencies();
   }
 }
 '@
@@ -512,7 +521,7 @@ class CustomTextField extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label),
-        SizedBox(height: 20.h),
+        SizedBox(height: 20),
         TextFormField(
           validator: validator,
           obscureText: obscureText,
@@ -557,26 +566,7 @@ void main() {
 
 }
 
-Write-Host "▶ Add assets files to pubspec.yaml..." -ForegroundColor Magenta
 
-function Update-FlutterSection {
-
-    $pubspecPath = "pubspec.yaml"
-    $content = Get-Content $pubspecPath -Raw
-
-    if ($content -notmatch "assets:") {
-
-        $content = $content -replace "uses-material-design:\s*true", @"
-uses-material-design: true
-
-  assets:
-    - assets/images/
-    - assets/svgs/
-"@
-
-        $content | Set-Content $pubspecPath -Encoding UTF8
-    }
-}
 
 Write-Host "▶ Generating core files..." -ForegroundColor Magenta
 
@@ -670,6 +660,8 @@ function Add-LatestPackages {
     }
 }
 
+Write-Host "▶ Add assets files to pubspec.yaml..." -ForegroundColor Magenta
+
 function Add-Assets {
     param([string[]]$AssetPaths)
 
@@ -732,12 +724,13 @@ Add-LatestPackages -Packages $dependencies
 
 Write-Host ""
 Write-Host "▶ Updating pubspec.yaml (dev_dependencies)..." -ForegroundColor Magenta
-Add-LatestPackages -Packages $devDependencies -Dev
+Add-LatestPackages -Packages $devdependencies -Dev
 
 Write-Host ""
 Write-Host "▶ Registering assets folders in pubspec.yaml..." -ForegroundColor Magenta
 $assetPaths = @(
     "assets/images/"
+    "assets/svgs/"
     "assets/icons/"
     "assets/fonts/"
     "assets/json/"
@@ -749,7 +742,6 @@ Write-Host "assets section updated" -ForegroundColor Gray
 Write-Host ""
 Write-Host "▶ Running flutter pub get..." -ForegroundColor Magenta
 
-Update-FlutterSection
 
 flutter pub get
 
