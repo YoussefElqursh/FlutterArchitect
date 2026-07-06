@@ -15,7 +15,6 @@ $folders = @(
   "assets",
   "assets/images",
   "assets/svgs",
-  "assets/fonts",
 
 # lib
     "lib",
@@ -475,6 +474,27 @@ class CustomTextField extends StatelessWidget {
 
 }
 
+Write-Host "▶ Add assets files to pubspec.yaml..." -ForegroundColor Magenta
+
+function Update-FlutterSection {
+
+    $pubspecPath = "pubspec.yaml"
+    $content = Get-Content $pubspecPath -Raw
+
+    if ($content -notmatch "assets:") {
+
+        $content = $content -replace "uses-material-design:\s*true", @"
+uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/svgs/
+"@
+
+        $content | Set-Content $pubspecPath -Encoding UTF8
+    }
+}
+
 Write-Host "▶ Generating core files..." -ForegroundColor Magenta
 
 foreach ($file in $files.Keys) {
@@ -618,6 +638,9 @@ Write-Host "dev_dependencies added" -ForegroundColor Gray
 
 Write-Host ""
 Write-Host "▶ Running flutter pub get..." -ForegroundColor Magenta
+
+Update-FlutterSection
+
 flutter pub get
 
 if ($LASTEXITCODE -ne 0) {
