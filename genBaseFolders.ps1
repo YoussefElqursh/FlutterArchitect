@@ -56,6 +56,12 @@ if ([string]::IsNullOrWhiteSpace($PackageName)) {
 # CREATE FOLDERS
 # =========================
 $folders = @(
+
+  #assets
+  "assets",
+  "assets/images",
+  "assets/svgs",
+
 # lib
     "lib",
 
@@ -551,6 +557,27 @@ void main() {
 
 }
 
+Write-Host "▶ Add assets files to pubspec.yaml..." -ForegroundColor Magenta
+
+function Update-FlutterSection {
+
+    $pubspecPath = "pubspec.yaml"
+    $content = Get-Content $pubspecPath -Raw
+
+    if ($content -notmatch "assets:") {
+
+        $content = $content -replace "uses-material-design:\s*true", @"
+uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/svgs/
+"@
+
+        $content | Set-Content $pubspecPath -Encoding UTF8
+    }
+}
+
 Write-Host "▶ Generating core files..." -ForegroundColor Magenta
 
 foreach ($file in $files.Keys) {
@@ -604,8 +631,7 @@ $dependencies = @(
     "firebase_auth"
     "cloud_firestore"
 )
-
-$devDependencies = @(
+$devPackages = @(
     "build_runner"
     "injectable_generator"
     "flutter_lints"
@@ -722,6 +748,9 @@ Write-Host "assets section updated" -ForegroundColor Gray
 
 Write-Host ""
 Write-Host "▶ Running flutter pub get..." -ForegroundColor Magenta
+
+Update-FlutterSection
+
 flutter pub get
 
 if ($LASTEXITCODE -ne 0) {

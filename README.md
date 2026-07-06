@@ -230,6 +230,8 @@ The generated structure follows the standard **Clean Architecture** principles b
 
 # 📦 Automatically Added Packages
 
+The scripts automatically fetch and add the **latest versions** of all required packages from [pub.dev](https://pub.dev), ensuring you always have up-to-date dependencies without manual version management.
+
 ## Dependencies
 
 - flutter_bloc
@@ -250,7 +252,21 @@ The generated structure follows the standard **Clean Architecture** principles b
 - injectable_generator
 - flutter_lints
 
-> Existing packages are detected automatically, so duplicates are never added. Versions are **not** hardcoded in the script — each package is added with `flutter pub add`, which always fetches the latest version compatible with your project's SDK constraints.
+### Asset Folders
+
+The script also creates the following asset directory structure:
+
+```
+assets/
+├── images/
+├── svgs/
+└── fonts/
+```
+
+> ✨ **Smart Features:**
+> - Existing packages are detected automatically, so duplicates are never added.
+> - Package versions are fetched dynamically from pub.dev, ensuring you always have the latest compatible versions.
+> - The script gracefully handles network errors and continues with the generation process.
 
 ---
 
