@@ -631,7 +631,7 @@ $dependencies = @(
     "firebase_auth"
     "cloud_firestore"
 )
-$devPackages = @(
+$devDependencies = @(
     "build_runner"
     "injectable_generator"
     "flutter_lints"
