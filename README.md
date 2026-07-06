@@ -81,6 +81,16 @@ Navigate to your Flutter project's root directory (where `pubspec.yaml` is locat
 pwsh .\genBaseFolders.ps1
 ```
 
+### 🆕 Starting from an empty folder
+
+If you're starting completely from scratch, you don't need to run `flutter create` yourself first. Pass the `-New` flag (and optionally `-OrgId`) and the script will create the Flutter project for you before scaffolding the architecture:
+
+```powershell
+pwsh .\genBaseFolders.ps1 -New -OrgId com.mycompany
+```
+
+This runs `flutter create --org com.mycompany .` in the current folder, then continues with the normal scaffolding. If `pubspec.yaml` already exists, this step is skipped automatically so nothing gets overwritten.
+
 ### This script automatically:
 
 1. Creates the base project structure (`app`, `core`, and `features`).
@@ -99,14 +109,15 @@ pwsh .\genBaseFolders.ps1
      - Utilities (Logger)
      - Helpers (Validators & SharedPreferences Helper)
      - A reusable `CustomTextField` built with `flutter_screenutil`
-3. Adds the required dependencies and dev dependencies to `pubspec.yaml` without duplicating existing packages.
-4. Runs:
+3. Creates an `assets/` folder at the project root (`images`, `icons`, `fonts`, `json`, each with a `.gitkeep`) and registers them under the `flutter: assets:` section of `pubspec.yaml`, skipping any paths that are already declared.
+4. Adds the required dependencies and dev dependencies to `pubspec.yaml` using `flutter pub add`, so every package always resolves to its **latest version compatible with your project**, without duplicating existing packages.
+5. Runs:
 
 ```bash
 flutter pub get
 ```
 
-5. Starts:
+6. Starts:
 
 ```bash
 dart run build_runner watch --delete-conflicting-outputs
@@ -205,6 +216,12 @@ lib
         ├── data          # Datasources, Models, Repository Implementations
         ├── domain        # Entities, Abstract Repositories, Use Cases
         └── presentation  # BLoC, Pages, Widgets
+
+assets                    # Project root (registered in pubspec.yaml)
+├── images
+├── icons
+├── fonts
+└── json
 ```
 
 The generated structure follows the standard **Clean Architecture** principles by clearly separating the **Data**, **Domain**, and **Presentation** layers while using **GetIt** and **Injectable** for Dependency Injection.
@@ -300,5 +317,6 @@ This project is licensed under the **MIT License**.
 <div align="center">
 
 Made with ❤️ by **Hossam** — Flutter Developer
+Contributing with ❤️ by **Youssef** — Flutter Developer
 
 </div>

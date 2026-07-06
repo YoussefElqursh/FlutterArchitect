@@ -1,3 +1,11 @@
+param(
+    # Pass -New to create a brand new Flutter project in the current
+    # (empty) folder before scaffolding the architecture, e.g.:
+    #   pwsh .\genBaseFolders.ps1 -New -OrgId com.mycompany
+    [switch]$New,
+    [string]$OrgId = "com.example"
+)
+
 Write-Host ""
 Write-Host "╔════════════════════════════════════════════════════╗" -ForegroundColor Cyan
 Write-Host "║          FLUTTER ARCHITECTURE GENERATOR            ║" -ForegroundColor Cyan
@@ -5,6 +13,44 @@ Write-Host "╚═════════════════════�
 Write-Host ""
 Write-Host "🚀 Starting Flutter Architecture Generator..." -ForegroundColor Green
 Write-Host ""
+
+# =========================
+# OPTIONAL: CREATE A NEW FLUTTER PROJECT FIRST
+# =========================
+if ($New) {
+    if (Test-Path "pubspec.yaml") {
+        Write-Host "⚠ pubspec.yaml already exists here — skipping 'flutter create'." -ForegroundColor Yellow
+        Write-Host ""
+    } else {
+        Write-Host "▶ Creating a new Flutter project in the current folder (org: $OrgId)..." -ForegroundColor Magenta
+        flutter create --org $OrgId .
+
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "❌ flutter create failed." -ForegroundColor Red
+            exit
+        }
+
+        Write-Host "   ✓ " -NoNewline -ForegroundColor DarkCyan
+        Write-Host "Flutter project created successfully." -ForegroundColor Gray
+        Write-Host ""
+    }
+}
+
+if (!(Test-Path "pubspec.yaml")) {
+    Write-Host "❌ pubspec.yaml not found!" -ForegroundColor Red
+    Write-Host "   Run this script inside a Flutter project, or add -New to create one first," -ForegroundColor Yellow
+    Write-Host "   e.g.: pwsh .\genBaseFolders.ps1 -New -OrgId com.mycompany" -ForegroundColor Yellow
+    exit
+}
+
+# Package name (from pubspec.yaml) is needed to fix imports in generated files,
+# e.g. the default test/widget_test.dart that "flutter create" ships with.
+$PackageName = ((Get-Content "pubspec.yaml" | Where-Object { $_ -match "^name:\s*" } | Select-Object -First 1) -replace "^name:\s*", "").Trim()
+
+if ([string]::IsNullOrWhiteSpace($PackageName)) {
+    Write-Host "⚠ Could not read 'name:' from pubspec.yaml — falling back to 'app'." -ForegroundColor Yellow
+    $PackageName = "app"
+}
 
 # =========================
 # CREATE FOLDERS
@@ -42,7 +88,14 @@ $folders = @(
     "lib/core/localization",
 
     # features
-    "lib/features"
+    "lib/features",
+
+    # assets (project root, referenced from pubspec.yaml)
+    "assets",
+    "assets/images",
+    "assets/icons",
+    "assets/fonts",
+    "assets/json"
 
 )
 
@@ -63,8 +116,7 @@ $files = @{
 
 # ENTRY POINT
     "lib/main.dart"                           = @'
-import 'package:flutter/material.dart';
-import 'app/app.dart';
+
 import 'app/bootstrap/bootstrap.dart';
 
 Future<void> main() async {
@@ -157,31 +209,40 @@ class AppBindings {
 
     "lib/app/observers/app_observer.dart"     = @'
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 class AppBlocObserver extends BlocObserver {
   @override
   void onCreate(BlocBase bloc) {
     super.onCreate(bloc);
-    print('Created: ${bloc.runtimeType}');
+    if (kDebugMode) {
+      print('Created: ${bloc.runtimeType}');
+    }
   }
 
   @override
   void onChange(BlocBase bloc, Change change) {
     super.onChange(bloc, change);
-    print('Changed: ${bloc.runtimeType} => $change');
+    if (kDebugMode) {
+      print('Changed: ${bloc.runtimeType} => $change');
+    }
   }
 
   @override
   void onError(BlocBase bloc, Object error, StackTrace stackTrace) {
-    print('Error: ${bloc.runtimeType} => $error');
+    if (kDebugMode) {
+      print('Error: ${bloc.runtimeType} => $error');
+    }
     super.onError(bloc, error, stackTrace);
   }
 
   @override
   void onClose(BlocBase bloc) {
     super.onClose(bloc);
-    print('Closed: ${bloc.runtimeType}');
+    if (kDebugMode) {
+      print('Closed: ${bloc.runtimeType}');
+    }
   }
 }
 '@
@@ -472,6 +533,28 @@ class CustomTextField extends StatelessWidget {
 
 '@
 
+    # keep empty asset folders tracked by git
+    "assets/images/.gitkeep" = ""
+    "assets/icons/.gitkeep"  = ""
+    "assets/fonts/.gitkeep"  = ""
+    "assets/json/.gitkeep"   = ""
+
+    # Overwrite the default flutter-create test, which references "MyApp"
+    # and a counter that no longer exist once this script rewrites main.dart/app.dart.
+    "test/widget_test.dart" = @"
+
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:$PackageName/app/app.dart';
+
+void main() {
+  testWidgets('App builds without crashing', (WidgetTester tester) async {
+    await tester.pumpWidget(const App());
+    expect(find.byType(App), findsOneWidget);
+  });
+}
+"@
+
 }
 
 Write-Host "▶ Add assets files to pubspec.yaml..." -ForegroundColor Magenta
@@ -528,8 +611,14 @@ Write-Host "   │   ├── helpers, services, utils" -ForegroundColor Gray
 Write-Host "   │   └── theme, widgets, localization" -ForegroundColor Gray
 Write-Host "   └── features" -ForegroundColor DarkYellow
 Write-Host ""
-Write-Host "▶ Fetching latest package versions..." -ForegroundColor Magenta
-$packages = @(
+Write-Host "   assets" -ForegroundColor DarkYellow
+Write-Host "   ├── images, icons, fonts, json" -ForegroundColor Gray
+Write-Host ""
+
+# Package names only (no pinned versions) — "flutter pub add" below always
+# resolves and writes the latest version that's compatible with the
+# project's SDK/dependency constraints, so the toolkit never goes stale.
+$dependencies = @(
     "flutter_bloc"
     "equatable"
     "dartz"
@@ -547,94 +636,115 @@ $devPackages = @(
     "injectable_generator"
     "flutter_lints"
 )
-function Get-LatestPackageVersion {
+
+function Add-LatestPackages {
     param(
-        [Parameter(Mandatory = $true)]
-        [string]$PackageName
+        [string[]]$Packages,
+        [switch]$Dev
     )
 
-    try {
-        $response = Invoke-RestMethod -Uri "https://pub.dev/api/packages/$PackageName"
+    foreach ($name in $Packages) {
 
-        $version = $response.latest.version
+        $pubspecContent = Get-Content "pubspec.yaml"
 
-        Write-Host "   ✓ $PackageName $version" -ForegroundColor DarkGray
+        if ($pubspecContent -match "^\s*$([regex]::Escape($name))\s*:") {
+            Write-Host "   ↷ " -NoNewline -ForegroundColor DarkYellow
+            Write-Host "$name already present, skipping" -ForegroundColor Gray
+            continue
+        }
 
-        return "^$version"
-    }
-    catch {
-        Write-Host "   ✗ Failed to fetch $PackageName" -ForegroundColor Red
-        return $null
-    }
-}
-$dependencies = @()
-foreach ($package in $packages) {
+        if ($Dev) {
+            flutter pub add "dev:$name" | Out-Null
+        } else {
+            flutter pub add $name | Out-Null
+        }
 
-    $version = Get-LatestPackageVersion $package
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "   ✗ " -NoNewline -ForegroundColor Red
+            Write-Host "failed to add $name" -ForegroundColor Gray
+            continue
+        }
 
-    if ($version) {
-        $dependencies += "$($package): $version"
-    }
-}
-
-
-$devDependencies = @()
-
-foreach ($package in $devPackages) {
-
-    $version = Get-LatestPackageVersion $package
-
-    if ($version) {
-     $devDependencies += "$($package): $version"
+        Write-Host "   ✓ " -NoNewline -ForegroundColor DarkCyan
+        Write-Host "$name (latest compatible version)" -ForegroundColor Gray
     }
 }
 
-
-function Add-Packages {
-    param(
-        [string]$Section,
-        [string[]]$Packages
-    )
+function Add-Assets {
+    param([string[]]$AssetPaths)
 
     $pubspecPath = "pubspec.yaml"
+    $content = @(Get-Content $pubspecPath)
 
-    $content = Get-Content $pubspecPath
+    $flutterIndex = -1
+    for ($i = 0; $i -lt $content.Count; $i++) {
+        # Only match the top-level "flutter:" section (no leading whitespace),
+        # not the indented "flutter:" SDK dependency under "dependencies:".
+        if ($content[$i] -match "^flutter:\s*$") { $flutterIndex = $i; break }
+    }
 
-    $output = @()
+    if ($flutterIndex -eq -1) {
+        Write-Host "   ⚠ 'flutter:' section not found, skipping assets." -ForegroundColor Yellow
+        return
+    }
 
-    foreach ($line in $content) {
+    $assetsIndex = -1
+    for ($i = $flutterIndex + 1; $i -lt $content.Count; $i++) {
+        if ($content[$i] -match "^\S") { break }
+        if ($content[$i].Trim() -eq "assets:") { $assetsIndex = $i; break }
+    }
 
-        $output += $line
+    $output = New-Object System.Collections.Generic.List[string]
+    $i = 0
 
-        if ($line.Trim() -eq "${Section}:") {
+    while ($i -lt $content.Count) {
+        $output.Add($content[$i])
 
-            foreach ($package in $Packages) {
-
-                $name = $package.Split(":")[0].Trim()
-
-                if (-not ($content -match "^\s*$([regex]::Escape($name))\s*:")) {
-                    $output += "  $package"
+        if ($assetsIndex -ne -1 -and $i -eq $assetsIndex) {
+            # walk past any existing "- path" list entries
+            $j = $i + 1
+            while ($j -lt $content.Count -and $content[$j].Trim().StartsWith("-")) {
+                $output.Add($content[$j])
+                $j++
+            }
+            foreach ($path in $AssetPaths) {
+                if (-not ($content -match [regex]::Escape("- $path"))) {
+                    $output.Add("    - $path")
                 }
             }
+            $i = $j - 1
         }
+        elseif ($assetsIndex -eq -1 -and $i -eq $flutterIndex) {
+            $output.Add("  assets:")
+            foreach ($path in $AssetPaths) {
+                $output.Add("    - $path")
+            }
+        }
+
+        $i++
     }
 
     $output | Set-Content $pubspecPath -Encoding UTF8
 }
-if (!(Test-Path "pubspec.yaml")) {
-    Write-Host "❌ pubspec.yaml not found!" -ForegroundColor Red
-    exit
-}
 
-Write-Host "▶ Updating pubspec.yaml..." -ForegroundColor Magenta
+Write-Host "▶ Updating pubspec.yaml (dependencies)..." -ForegroundColor Magenta
+Add-LatestPackages -Packages $dependencies
 
-Add-Packages -Section "dependencies" -Packages $dependencies
+Write-Host ""
+Write-Host "▶ Updating pubspec.yaml (dev_dependencies)..." -ForegroundColor Magenta
+Add-LatestPackages -Packages $devDependencies -Dev
+
+Write-Host ""
+Write-Host "▶ Registering assets folders in pubspec.yaml..." -ForegroundColor Magenta
+$assetPaths = @(
+    "assets/images/"
+    "assets/icons/"
+    "assets/fonts/"
+    "assets/json/"
+)
+Add-Assets -AssetPaths $assetPaths
 Write-Host "   ✓ " -NoNewline -ForegroundColor DarkCyan
-Write-Host "dependencies added" -ForegroundColor Gray
-
-Add-Packages -Section "dev_dependencies" -Packages $devDependencies
-Write-Host "   ✓ " -NoNewline -ForegroundColor DarkCyan
-Write-Host "dev_dependencies added" -ForegroundColor Gray
+Write-Host "assets section updated" -ForegroundColor Gray
 
 Write-Host ""
 Write-Host "▶ Running flutter pub get..." -ForegroundColor Magenta
