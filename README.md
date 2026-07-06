@@ -64,7 +64,7 @@ https://github.com/PowerShell/PowerShell
 1. Clone the repository (or download the scripts manually):
 
 ```bash
-git clone https://github.com/HossamHesham2/FlutterArchitect
+git clone https://github.com/YoussefElqursh/FlutterArchitect.git
 ```
 
 2. Copy `genBaseFolders.ps1` and `genFeature.ps1` into the root directory of your Flutter project (the same directory that contains `pubspec.yaml`).
