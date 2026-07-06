@@ -10,6 +10,13 @@ Write-Host ""
 # CREATE FOLDERS
 # =========================
 $folders = @(
+
+  #assets
+  "assets",
+  "assets/images",
+  "assets/svgs",
+  "assets/fonts",
+
 # lib
     "lib",
 
@@ -501,26 +508,68 @@ Write-Host "   │   ├── helpers, services, utils" -ForegroundColor Gray
 Write-Host "   │   └── theme, widgets, localization" -ForegroundColor Gray
 Write-Host "   └── features" -ForegroundColor DarkYellow
 Write-Host ""
-
-$dependencies = @(
-    "flutter_bloc: ^9.1.1"
-    "equatable: ^2.0.7"
-    "dartz: ^0.10.1"
-    "get_it: ^8.2.0"
-    "injectable: ^2.5.1"
-    "dio: ^5.9.0"
-    "shared_preferences: ^2.5.3"
-    "flutter_screenutil: ^5.9.3"
-    "firebase_core: ^4.0.0"
-    "firebase_auth: ^6.0.1"
-    "cloud_firestore: ^6.0.0"
+Write-Host "▶ Fetching latest package versions..." -ForegroundColor Magenta
+$packages = @(
+    "flutter_bloc"
+    "equatable"
+    "dartz"
+    "get_it"
+    "injectable"
+    "dio"
+    "shared_preferences"
+    "flutter_screenutil"
+    "firebase_core"
+    "firebase_auth"
+    "cloud_firestore"
 )
-
-$devDependencies = @(
-    "build_runner: ^2.5.4"
-    "injectable_generator: ^2.7.0"
-    "flutter_lints: ^6.0.0"
+$devPackages = @(
+    "build_runner"
+    "injectable_generator"
+    "flutter_lints"
 )
+function Get-LatestPackageVersion {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$PackageName
+    )
+
+    try {
+        $response = Invoke-RestMethod -Uri "https://pub.dev/api/packages/$PackageName"
+
+        $version = $response.latest.version
+
+        Write-Host "   ✓ $PackageName $version" -ForegroundColor DarkGray
+
+        return "^$version"
+    }
+    catch {
+        Write-Host "   ✗ Failed to fetch $PackageName" -ForegroundColor Red
+        return $null
+    }
+}
+$dependencies = @()
+foreach ($package in $packages) {
+
+    $version = Get-LatestPackageVersion $package
+
+    if ($version) {
+        $dependencies += "$($package): $version"
+    }
+}
+
+
+$devDependencies = @()
+
+foreach ($package in $devPackages) {
+
+    $version = Get-LatestPackageVersion $package
+
+    if ($version) {
+     $devDependencies += "$($package): $version"
+    }
+}
+
+
 function Add-Packages {
     param(
         [string]$Section,
